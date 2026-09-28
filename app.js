@@ -3,6 +3,7 @@ const connectionDb = require('./src/config/dbconnection');
 const app = express();
 const dns = require("dns");
 dns.setServers(["8.8.8.8", "8.8.4.4"]);
+const bcrypt = require('bcrypt');
 const User = require('./src/models/user');
 
 app.use(express.json());
@@ -12,6 +13,8 @@ app.use(express.json());
 app.post('/signup', async (req, res) => {
     try {
         const user = new User(req.body);
+        const passwordHash = await bcrypt.hash(user.password, 10);
+        user.password = passwordHash;
         await user.save();
         res.send('User created successfully');
     }
@@ -20,6 +23,23 @@ app.post('/signup', async (req, res) => {
     }
 });
 
+app.post('/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const user = await User.findOne({ email }); 
+        if (!user) {
+            return res.status(404).send('User not found');
+        }
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).send('Invalid credentials');
+        }
+        res.cookie('userId', user._id, { httpOnly: true });
+        res.send('Login successful');
+    } catch (error) {
+        res.status(400).send(error.message);
+    }
+});
 
 app.get('/users', async (req, res) => {
     const UserEmail = req.body.email;
