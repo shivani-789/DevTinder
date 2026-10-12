@@ -5,23 +5,23 @@ const dns = require("dns");
 dns.setServers(["8.8.8.8", "8.8.4.4"]);
 const bcrypt = require('bcrypt');
 const User = require('./src/models/user');
+const jwt = require('jsonwebtoken');
+// const secretKey = 'devtinder45678910'; // Replace
+const cookieParser = require('cookie-parser');
+const {authMiddleware} = require('./src/middlwares/auth');
+
+
+
+require('dotenv').config();
+
+const secretKey = process.env.SECRET_KEY;
+
+console.log("Secret exists:", !!secretKey);
 
 app.use(express.json());
 
+app.use(cookieParser());
 
-
-app.post('/signup', async (req, res) => {
-    try {
-        const user = new User(req.body);
-        const passwordHash = await bcrypt.hash(user.password, 10);
-        user.password = passwordHash;
-        await user.save();
-        res.send('User created successfully');
-    }
-    catch (error) {
-        res.status(400).send(error.message);
-    }
-});
 
 app.post('/login', async (req, res) => {
     try {
@@ -31,10 +31,13 @@ app.post('/login', async (req, res) => {
             return res.status(404).send('User not found');
         }
         const isMatch = await bcrypt.compare(password, user.password);
+
+        const token = jwt.sign({ userId: user._id }, secretKey, { expiresIn: '1h' });
+        console.log('Generated JWT:', token); // Log the generated token
         if (!isMatch) {
             return res.status(400).send('Invalid credentials');
         }
-        res.cookie('userId', user._id, { httpOnly: true });
+        res.cookie("token", token);
         res.send('Login successful');
     } catch (error) {
         res.status(400).send(error.message);
@@ -63,6 +66,29 @@ app.patch('/users', async (req, res) => {
         res.status(400).send(error.message);
     }
 });
+
+app.get('/profile', authMiddleware, async (req, res) => {
+    try {
+          const user = req.user;
+          console.log('Retrieved user profile:', user);
+          res.send(user);
+       
+    }
+    catch (error) {
+        res.status(400).send("Error message",error.message);
+    }
+})
+                                                                                                    
+
+
+
+
+
+
+
+
+
+
 
 connectionDb().then(()=>{
     console.log('Database connected successfully');
